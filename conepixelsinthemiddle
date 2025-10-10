@@ -1,58 +1,62 @@
 clc;
 clear;
 
-% Connect to Arduino on COM5
+% Connect to Arduino
 a = arduino('COM5', 'MKR1010');
 
 % Read voltages from analog pins
-v5  = readVoltage(a, 'A0');   % Replace with A5 if that's the actual pin
-v8  = readVoltage(a, 'A1');   % Replace with A8 if that's the actual pin
-v9  = readVoltage(a, 'A2');   % Replace with A9 if that's the actual pin
-v12 = readVoltage(a, 'A3');   % Replace with A12 if that's the actual pin
+v6 = readVoltage(a, 'A0');
+v7 = readVoltage(a, 'A1');
+v10 = readVoltage(a, 'A2');
+v11 = readVoltage(a, 'A3');
 
-% Convert to grayscale
-voltages = [v5, v8, v9, v12];
-gray_values = floor((voltages / 3.3) * 255);
-gray_values = min(gray_values, 255);
+% Convert voltages to 0–255
+to255 = @(v) uint8(min(floor((v / 3.3) * 255), 255));
+r10 = to255(v10); g6 = to255(v6); b10 = r10; % purple from pin 10, green from pin 6
+r11 = to255(v11); g7 = to255(v7); b11 = r11; % purple from pin 11, green from pin 7
 
-% Create blank 4x4 matrix
-gray_matrix = zeros(4, 4);
+% Create 4x4x3 RGB matrix
+rgb_img = zeros(4, 4, 3, 'uint8');
 
-% Assign to correct positions
-gray_matrix(2,1) = gray_values(1);  % index 5
-gray_matrix(2,4) = gray_values(2);  % index 8
-gray_matrix(3,1) = gray_values(3);  % index 9
-gray_matrix(3,4) = gray_values(4);  % index 12
+% Elongated rectangle for pixels 6 (row2,col2) + 10 (row3,col2)
+rgb_img(2, 2, :) = [r10, g6, b10];  % top part
+rgb_img(3, 2, :) = [r10, g6, b10];  % bottom part
 
-%% Display Voltages on Primary Screen
+% Elongated rectangle for pixels 7 (row2,col3) + 11 (row3,col3)
+rgb_img(2, 3, :) = [r11, g7, b11];  % top part
+rgb_img(3, 3, :) = [r11, g7, b11];  % bottom part
+
+%% Display info
 monitors = get(0, 'MonitorPositions');
 primary_pos = monitors(1, :);
-if size(monitors, 1) >= 2
-    second_pos = monitors(2, :);
+if size(monitors,1) >= 2
+    second_pos = monitors(2,:);
 else
-    second_pos = monitors(1, :);
+    second_pos = monitors(1,:);
 end
 
-fig1 = figure('Name', 'Voltage Readings for 4x4 Mapping', ...
+fig1 = figure('Name', 'Elongated Color Pixels', ...
               'NumberTitle', 'off', 'MenuBar', 'none', ...
               'ToolBar', 'none', 'Units', 'pixels', ...
-              'Position', [primary_pos(1)+100, primary_pos(2)+100, 500, 400]);
+              'Position', [primary_pos(1)+100, primary_pos(2)+100, 600, 400]);
 
-pin_labels = {'A5 → index 5', 'A8 → index 8', 'A9 → index 9', 'A12 → index 12'};
-for i = 1:4
+% Info display
+labels = {
+    sprintf('Pins 6 + 10 → Green+Purple: G=%.2f V, P=%.2f V', v6, v10), ...
+    sprintf('Pins 7 + 11 → Green+Purple: G=%.2f V, P=%.2f V', v7, v11)
+};
+for i = 1:2
     uicontrol('Style', 'text', 'Units', 'normalized', ...
-        'Position', [0.1, 0.85 - (i-1)*0.2, 0.8, 0.15], ...
-        'FontSize', 16, ...
-        'String', sprintf('%s: %.2f V → %d', ...
-            pin_labels{i}, voltages(i), gray_values(i)));
+        'Position', [0.1, 0.7 - (i-1)*0.2, 0.8, 0.15], ...
+        'FontSize', 14, ...
+        'String', labels{i});
 end
-
 drawnow;
 
-%% Show Image on Second Screen
+%% Display on second screen
 screenW = second_pos(3);
 screenH = second_pos(4);
-big_img = imresize(gray_matrix, [screenH, screenW], 'nearest');
+big_img = imresize(rgb_img, [screenH, screenW], 'nearest');
 
 fig2 = figure('MenuBar', 'none', 'ToolBar', 'none', ...
               'NumberTitle', 'off', 'Color', 'black', ...
@@ -63,7 +67,8 @@ catch
 end
 
 ax = axes('Parent', fig2, 'Units', 'normalized', 'Position', [0 0 1 1]);
-imshow(uint8(big_img), 'Parent', ax);
+imshow(big_img, 'Parent', ax);
 axis off;
 
-imwrite(uint8(big_img), 'gray_4x4_selected_indices.jpeg', 'JPEG');
+% Save result
+imwrite(big_img, 'elongated_pixel_6_7_10_11.jpeg', 'JPEG');
