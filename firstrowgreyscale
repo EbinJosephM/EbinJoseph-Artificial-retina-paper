@@ -1,0 +1,138 @@
+clc;
+clear;
+
+% Connect to Arduino
+a = arduino('COM5', 'MKR1010');  % Adjust COM port if needed
+
+% Read voltages from four analog input channels
+v1 = readVoltage(a, 'A0');
+v2 = readVoltage(a, 'A1');
+v3 = readVoltage(a, 'A2');
+v4 = readVoltage(a, 'A3');
+
+% Convert voltages to grayscale (0–255)
+voltages = [v1, v2, v3, v4];
+gray_values = floor((voltages / 3.3) * 255);  % scale to 255
+gray_values = min(gray_values, 255);         % ensure max is 255
+
+% Create 4x4 grayscale matrix and fill first row with values
+gray_matrix = zeros(4, 4);
+gray_matrix(1, :) = gray_values;
+
+%% Detect Screens
+monitors = get(0, 'MonitorPositions');
+primary_pos = monitors(1, :);
+if size(monitors, 1) >= 2
+    second_pos = monitors(2, :);
+else
+    second_pos = monitors(1, :);
+end
+
+%% Primary Screen: Display Voltages
+fig1 = figure('Name', 'Arduino Voltage Readings', ...
+              'NumberTitle', 'off', ...
+              'MenuBar', 'none', ...
+              'ToolBar', 'none', ...
+              'Units', 'pixels', ...
+              'Position', [primary_pos(1)+100, primary_pos(2)+100, 500, 400]);
+
+for i = 1:4
+    uicontrol('Style', 'text', 'Units', 'normalized', ...
+        'Position', [0.1, 0.85 - (i-1)*0.2, 0.8, 0.15], ...
+        'FontSize', 16, ...
+        'String', sprintf('A%d (Pixel %d): %.2f V → %d', i-1, i, voltages(i), gray_values(i)));
+end
+
+drawnow;
+
+%% Second Screen: Display Image
+screenW = second_pos(3);
+screenH = second_pos(4);
+big_img = imresize(gray_matrix, [screenH, screenW], 'nearest');
+
+fig2 = figure('MenuBar', 'none', 'ToolBar', 'none', ...
+              'NumberTitle', 'off', 'Color', 'black', ...
+              'Units', 'pixels', ...
+              'Position', second_pos);
+
+try
+    set(fig2, 'WindowState', 'fullscreen');
+catch
+    % Fallback for older MATLAB versions
+end
+
+ax = axes('Parent', fig2, 'Units', 'normalized', 'Position', [0 0 1 1]);
+imshow(uint8(big_img), 'Parent', ax);
+axis off;
+
+% Save image
+imwrite(uint8(big_img), 'gray_4x4_first_row.jpeg', 'JPEG');
+clc;
+clear;
+
+% Connect to Arduino
+a = arduino('COM5', 'MKR1010');  % Adjust COM port if needed
+
+% Read voltages from four analog input channels
+v1 = readVoltage(a, 'A0');
+v2 = readVoltage(a, 'A1');
+v3 = readVoltage(a, 'A2');
+v4 = readVoltage(a, 'A3');
+
+% Convert voltages to grayscale (0–255)
+voltages = [v1, v2, v3, v4];
+gray_values = floor((voltages / 3.3) * 255);  % scale to 255
+gray_values = min(gray_values, 255);         % ensure max is 255
+
+% Create 4x4 grayscale matrix and fill first row with values
+gray_matrix = zeros(4, 4);
+gray_matrix(1, :) = gray_values;
+
+%% Detect Screens
+monitors = get(0, 'MonitorPositions');
+primary_pos = monitors(1, :);
+if size(monitors, 1) >= 2
+    second_pos = monitors(2, :);
+else
+    second_pos = monitors(1, :);
+end
+
+%% Primary Screen: Display Voltages
+fig1 = figure('Name', 'Arduino Voltage Readings', ...
+              'NumberTitle', 'off', ...
+              'MenuBar', 'none', ...
+              'ToolBar', 'none', ...
+              'Units', 'pixels', ...
+              'Position', [primary_pos(1)+100, primary_pos(2)+100, 500, 400]);
+
+for i = 1:4
+    uicontrol('Style', 'text', 'Units', 'normalized', ...
+        'Position', [0.1, 0.85 - (i-1)*0.2, 0.8, 0.15], ...
+        'FontSize', 16, ...
+        'String', sprintf('A%d (Pixel %d): %.2f V → %d', i-1, i, voltages(i), gray_values(i)));
+end
+
+drawnow;
+
+%% Second Screen: Display Image
+screenW = second_pos(3);
+screenH = second_pos(4);
+big_img = imresize(gray_matrix, [screenH, screenW], 'nearest');
+
+fig2 = figure('MenuBar', 'none', 'ToolBar', 'none', ...
+              'NumberTitle', 'off', 'Color', 'black', ...
+              'Units', 'pixels', ...
+              'Position', second_pos);
+
+try
+    set(fig2, 'WindowState', 'fullscreen');
+catch
+    % Fallback for older MATLAB versions
+end
+
+ax = axes('Parent', fig2, 'Units', 'normalized', 'Position', [0 0 1 1]);
+imshow(uint8(big_img), 'Parent', ax);
+axis off;
+
+% Save image
+imwrite(uint8(big_img), 'gray_4x4_first_row.jpeg', 'JPEG');
