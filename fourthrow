@@ -1,0 +1,77 @@
+clc;
+clear;
+
+% Connect to Arduino
+a = arduino('COM5', 'MKR1010');  % Adjust COM port if needed
+
+% Read voltages corresponding to pixels 4, 8, 12, and 16
+v4  = readVoltage(a, 'A0');  % Pixel 4
+v8  = readVoltage(a, 'A1');  % Pixel 8
+v12 = readVoltage(a, 'A2');  % Pixel 12
+v16 = readVoltage(a, 'A3');  % Pixel 16
+
+% Convert voltages to grayscale (0–255)
+voltages = [v4, v8, v12, v16];
+gray_values = floor((voltages / 3.3) * 255);  % scale to 0–255
+gray_values = min(gray_values, 255);          % ensure upper bound
+
+% Create 4×4×3 RGB matrix
+rgb_img = zeros(4, 4, 3, 'uint8');
+
+% Fill the fourth column (pixels 4, 8, 12, 16)
+for i = 1:4
+    row = i; col = 4;  % column 4 (rightmost)
+    val = gray_values(i);
+    rgb_img(row, col, :) = [val, val, val];  % grayscale (R=G=B)
+end
+
+%% Detect Screens
+monitors = get(0, 'MonitorPositions');
+primary_pos = monitors(1, :);
+if size(monitors, 1) >= 2
+    second_pos = monitors(2, :);
+else
+    second_pos = monitors(1, :);
+end
+
+%% Primary Screen: Display Voltages
+fig1 = figure('Name', 'Column 4 Pixels (4,8,12,16)', ...
+              'NumberTitle', 'off', ...
+              'MenuBar', 'none', ...
+              'ToolBar', 'none', ...
+              'Units', 'pixels', ...
+              'Position', [primary_pos(1)+100, primary_pos(2)+100, 550, 420]);
+
+pixel_labels = [4, 8, 12, 16];
+
+for i = 1:4
+    uicontrol('Style', 'text', 'Units', 'normalized', ...
+        'Position', [0.1, 0.85 - (i-1)*0.2, 0.8, 0.15], ...
+        'FontSize', 16, ...
+        'String', sprintf('Pixel %d (A%d): %.2f V → %d', ...
+        pixel_labels(i), i-1, voltages(i), gray_values(i)));
+end
+drawnow;
+
+%% Second Screen: Display Image
+screenW = second_pos(3);
+screenH = second_pos(4);
+big_img = imresize(rgb_img, [screenH, screenW], 'nearest');
+
+fig2 = figure('MenuBar', 'none', 'ToolBar', 'none', ...
+              'NumberTitle', 'off', 'Color', 'black', ...
+              'Units', 'pixels', ...
+              'Position', second_pos);
+
+try
+    set(fig2, 'WindowState', 'fullscreen');
+catch
+    % Fallback for older MATLAB versions
+end
+
+ax = axes('Parent', fig2, 'Units', 'normalized', 'Position', [0 0 1 1]);
+imshow(big_img, 'Parent', ax);
+axis off;
+
+% Save image
+imwrite(big_img, 'gray_column_4_pixels_4_8_12_16.jpeg', 'JPEG');
