@@ -1,0 +1,81 @@
+clc;
+clear;
+
+% Connect to Arduino
+a = arduino('COM5', 'MKR1010');  % Adjust COM port if needed
+
+% Read voltages corresponding to pixels 2, 6, 10, and 14
+v2  = readVoltage(a, 'A0');  % Pixel 2 (gray)
+v6  = readVoltage(a, 'A1');  % Pixel 6 (green)
+v10 = readVoltage(a, 'A2');  % Pixel 10 (purple)
+v14 = readVoltage(a, 'A3');  % Pixel 14 (gray)
+
+% Convert voltages to 0–255
+to255 = @(v) uint8(min(floor((v / 3.3) * 255), 255));
+
+val2  = to255(v2);
+val6  = to255(v6);
+val10 = to255(v10);
+val14 = to255(v14);
+
+% Combine pins 6 (green) & 10 (purple)
+threshold = 10;  % small noise threshold
+r_comb = val10;
+g_comb = val6;
+b_comb = val10;
+
+% Adjust if only one is active
+if val6 > threshold && val10 <= threshold
+    r_comb = 0; b_comb = 0;           % only green
+elseif val10 > threshold && val6 <= threshold
+    g_comb = 0;                        % only purple
+elseif val6 <= threshold && val10 <= threshold
+    r_comb = 0; g_comb = 0; b_comb = 0;  % both off
+end
+
+% Create RGB image (4x4x3)
+rgb_img = zeros(4, 4, 3, 'uint8');
+
+% Assign pixels in second column
+rgb_img(1, 2, :) = [val2, val2, val2];         % Pixel 2 → gray
+rgb_img(2, 2, :) = [r_comb, g_comb, b_comb];   % Combined 6+10
+rgb_img(3, 2, :) = [r_comb, g_comb, b_comb];   % Duplicate to make elongated pixel
+rgb_img(4, 2, :) = [val14, val14, val14];      % Pixel 14 → gray
+
+%% Detect screens
+monitors = get(0, 'MonitorPositions');
+primary_pos = monitors(1, :);
+second_pos = monitors(min(2, size(monitors,1)), :);
+
+%% Display voltage info
+fig1 = figure('Name', 'Second Column Pixels (2,6+10,14)', ...
+              'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none', ...
+              'Units', 'pixels', 'Position', [primary_pos(1)+100, primary_pos(2)+100, 550, 420]);
+
+uicontrol('Style','text','Units','normalized','Position',[0.1 0.8 0.8 0.15],...
+    'FontSize',16,'String',sprintf('Pixel 2 (A0): %.2f V → %d (Gray)',v2,val2));
+uicontrol('Style','text','Units','normalized','Position',[0.1 0.55 0.8 0.15],...
+    'FontSize',16,'String',sprintf('Pixels 6+10 combined: G=%.2f V, P=%.2f V → [R=%d, G=%d, B=%d]',v6,v10,r_comb,g_comb,b_comb));
+uicontrol('Style','text','Units','normalized','Position',[0.1 0.3 0.8 0.15],...
+    'FontSize',16,'String',sprintf('Pixel 14 (A3): %.2f V → %d (Gray)',v14,val14));
+
+drawnow;
+
+%% Display image on second screen
+screenW = second_pos(3);
+screenH = second_pos(4);
+big_img = imresize(rgb_img, [screenH, screenW], 'nearest');
+
+fig2 = figure('MenuBar','none','ToolBar','none','NumberTitle','off','Color','black',...
+              'Units','pixels','Position',second_pos);
+try
+    set(fig2,'WindowState','fullscreen');
+catch
+end
+
+ax = axes('Parent',fig2,'Units','normalized','Position',[0 0 1 1]);
+imshow(big_img,'Parent',ax);
+axis off;
+
+% Save image
+imwrite(big_img, 'combined_column_2_6_10_14.jpeg','JPEG');
