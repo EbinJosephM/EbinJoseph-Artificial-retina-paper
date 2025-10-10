@@ -1,0 +1,69 @@
+clc;
+clear;
+
+% Connect to Arduino on COM5
+a = arduino('COM5', 'MKR1010');
+
+% Read voltages from analog pins A13–A16
+v13 = readVoltage(a, 'A0');
+v14 = readVoltage(a, 'A1');
+v15 = readVoltage(a, 'A2');
+v16 = readVoltage(a, 'A3');
+
+% Convert to grayscale values
+voltages = [v13, v14, v15, v16];
+gray_values = floor((voltages / 3.3) * 255);
+gray_values = min(gray_values, 255);
+
+% Create blank 4x4 grayscale matrix
+gray_matrix = zeros(4, 4);
+
+% Assign grayscale values to correct matrix positions
+gray_matrix(4,1) = gray_values(1);  % index 13
+gray_matrix(4,2) = gray_values(2);  % index 14
+gray_matrix(4,3) = gray_values(3);  % index 15
+gray_matrix(4,4) = gray_values(4);  % index 16
+
+%% Show Voltage Values on Primary Screen
+monitors = get(0, 'MonitorPositions');
+primary_pos = monitors(1, :);
+if size(monitors, 1) >= 2
+    second_pos = monitors(2, :);
+else
+    second_pos = monitors(1, :);
+end
+
+fig1 = figure('Name', 'Voltage Readings for A13–A16', ...
+              'NumberTitle', 'off', 'MenuBar', 'none', ...
+              'ToolBar', 'none', 'Units', 'pixels', ...
+              'Position', [primary_pos(1)+100, primary_pos(2)+100, 500, 400]);
+
+pin_labels = {'A13 → index 13', 'A14 → index 14', 'A15 → index 15', 'A16 → index 16'};
+for i = 1:4
+    uicontrol('Style', 'text', 'Units', 'normalized', ...
+        'Position', [0.1, 0.85 - (i-1)*0.2, 0.8, 0.15], ...
+        'FontSize', 16, ...
+        'String', sprintf('%s: %.2f V → %d', ...
+            pin_labels{i}, voltages(i), gray_values(i)));
+end
+
+drawnow;
+
+%% Show Image on Second Screen
+screenW = second_pos(3);
+screenH = second_pos(4);
+big_img = imresize(gray_matrix, [screenH, screenW], 'nearest');
+
+fig2 = figure('MenuBar', 'none', 'ToolBar', 'none', ...
+              'NumberTitle', 'off', 'Color', 'black', ...
+              'Units', 'pixels', 'Position', second_pos);
+try
+    set(fig2, 'WindowState', 'fullscreen');
+catch
+end
+
+ax = axes('Parent', fig2, 'Units', 'normalized', 'Position', [0 0 1 1]);
+imshow(uint8(big_img), 'Parent', ax);
+axis off;
+
+imwrite(uint8(big_img), 'gray_4x4_A13_to_A16.jpeg', 'JPEG');
